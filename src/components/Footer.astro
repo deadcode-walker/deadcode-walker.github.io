@@ -1,0 +1,29 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <span>© {year} · deadcode-walker · built with astro</span>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    padding: 2rem 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .footer-inner {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 11px;
+    color: var(--fg-faint);
+    flex-wrap: wrap;
+  }
+
+  .dot {
+    color: var(--border);
+  }
+</style>

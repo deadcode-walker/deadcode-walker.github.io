@@ -1,0 +1,404 @@
+---
+interface Repo {
+  name: string;
+  description: string | null;
+  fork: boolean;
+  html_url: string;
+  stargazers_count: number;
+  created_at: string;
+  pushed_at: string;
+}
+
+const FALLBACK_PROJECTS = [
+  {
+    name: "forge",
+    desc: "high-performance csv data toolkit. cli + gui. filter, select, join, aggregate.",
+    tags: ["c++20", "imgui", "sdl3"],
+    year: "2024",
+    stars: 0,
+    url: "https://github.com/deadcode-walker/forge",
+    pushed: "2024-01-01",
+  },
+  {
+    name: "asterisk-rs",
+    desc: "async asterisk ami client library for rust. typed events, action builders, connection pooling.",
+    tags: ["rust", "asterisk", "async"],
+    year: "2024",
+    stars: 0,
+    url: "https://github.com/deadcode-walker/asterisk-rs",
+    pushed: "2024-01-01",
+  },
+];
+
+type Project = {
+  name: string;
+  desc: string;
+  tags: string[];
+  year: string;
+  stars: number;
+  url: string;
+  pushed: string;
+};
+
+let projects: Project[] = FALLBACK_PROJECTS;
+
+try {
+  const res = await fetch(
+    "https://api.github.com/users/deadcode-walker/repos?sort=updated&per_page=30"
+  );
+  if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
+  const allRepos: Repo[] = await res.json();
+
+  const filtered = allRepos.filter(
+    (repo) => !repo.fork && repo.name !== "deadcode-walker"
+  );
+
+  const withLanguages = await Promise.all(
+    filtered.map(async (repo) => {
+      let tags: string[] = [];
+      try {
+        const langRes = await fetch(
+          `https://api.github.com/repos/deadcode-walker/${repo.name}/languages`
+        );
+        if (langRes.ok) {
+          const languages: Record<string, number> = await langRes.json();
+          tags = Object.keys(languages).map((l) => l.toLowerCase());
+        }
+      } catch {
+        // language fetch failed; leave tags empty
+      }
+      return {
+        name: repo.name,
+        desc: repo.description ?? "",
+        tags,
+        year: new Date(repo.created_at).getFullYear().toString(),
+        stars: repo.stargazers_count,
+        url: repo.html_url,
+        pushed: repo.pushed_at,
+      };
+    })
+  );
+
+  withLanguages.sort(
+    (a, b) => new Date(b.pushed).getTime() - new Date(a.pushed).getTime()
+  );
+
+  projects = withLanguages;
+} catch {
+  // API unavailable or rate-limited; fall through to hardcoded fallback
+}
+
+const PAGE_SIZE = 3;
+const totalPages = Math.ceil(projects.length / PAGE_SIZE);
+const projectsJSON = JSON.stringify(projects.map((p, i) => ({ i, stars: p.stars, pushed: p.pushed })));
+---
+
+<section id="work" class="work">
+  <div class="container">
+    <div class="work-header reveal">
+      <h2 class="section-label">selected work</h2>
+      <div class="work-controls">
+        <button class="sort-btn active" id="sort-recent" aria-label="Sort by recent">
+          recent ↓
+        </button>
+        <button class="sort-btn" id="sort-stars" aria-label="Sort by stars">
+          ★ starred
+        </button>
+        {totalPages > 1 && (
+          <div class="pager">
+            <span class="page-info">
+              <span id="page-current">1</span>/<span id="page-total">{totalPages}</span>
+            </span>
+            <button class="pager-btn" id="prev-btn" aria-label="Previous" disabled>←</button>
+            <button class="pager-btn" id="next-btn" aria-label="Next">→</button>
+          </div>
+        )}
+      </div>
+    </div>
+    <div class="project-list stagger" id="project-list">
+      {projects.map((project, i) => (
+        <article
+          class:list={["project", "reveal", { hidden: i >= PAGE_SIZE }]}
+          data-index={i}
+          data-stars={project.stars}
+          data-pushed={project.pushed}
+        >
+          <div class="project-header">
+            <h3 class="project-name">
+              <a href={project.url} target="_blank" rel="noopener noreferrer" class="project-link">
+                {project.name}
+              </a>
+            </h3>
+            <div class="project-meta">
+              <span class="project-stars" class:list={{ dim: project.stars === 0 }}>
+                ★ {project.stars}
+              </span>
+              <span class="meta-sep">·</span>
+              <span class="project-year">{project.year}</span>
+            </div>
+          </div>
+          {project.desc && <p class="project-desc">{project.desc}</p>}
+          {project.tags.length > 0 && (
+            <div class="project-tags">
+              {project.tags.map((tag) => (
+                <span class="tag">{tag}</span>
+              ))}
+            </div>
+          )}
+        </article>
+      ))}
+    </div>
+  </div>
+</section>
+
+<script define:vars={{ PAGE_SIZE, totalPages, projectsJSON }}>
+  let page = 0;
+  let currentSort = "recent";
+  const projectEls = [...document.querySelectorAll(".project[data-index]")];
+  const list = document.getElementById("project-list");
+  const prev = document.getElementById("prev-btn");
+  const next = document.getElementById("next-btn");
+  const currentEl = document.getElementById("page-current");
+  const totalEl = document.getElementById("page-total");
+  const sortRecent = document.getElementById("sort-recent");
+  const sortStars = document.getElementById("sort-stars");
+  const meta = JSON.parse(projectsJSON);
+
+  // Sort order: array of original indices in display order
+  let order = meta.map((m) => m.i);
+
+  function reorder(sortBy) {
+    const sorted = [...meta];
+    if (sortBy === "stars") {
+      sorted.sort((a, b) => b.stars - a.stars || new Date(b.pushed).getTime() - new Date(a.pushed).getTime());
+    } else {
+      sorted.sort((a, b) => new Date(b.pushed).getTime() - new Date(a.pushed).getTime());
+    }
+    order = sorted.map((m) => m.i);
+    page = 0;
+    currentSort = sortBy;
+
+    sortRecent.classList.toggle("active", sortBy === "recent");
+    sortStars.classList.toggle("active", sortBy === "stars");
+
+    // Reorder DOM
+    order.forEach((idx) => {
+      const el = projectEls.find((e) => Number(e.dataset.index) === idx);
+      if (el) list.appendChild(el);
+    });
+
+    render();
+  }
+
+  function render() {
+    const pages = Math.ceil(order.length / PAGE_SIZE);
+    const start = page * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    const visible = new Set(order.slice(start, end));
+
+    projectEls.forEach((el) => {
+      const i = Number(el.dataset.index);
+      if (visible.has(i)) {
+        el.classList.remove("hidden");
+        el.classList.add("visible");
+      } else {
+        el.classList.add("hidden");
+        el.classList.remove("visible");
+      }
+    });
+
+    if (prev) prev.disabled = page === 0;
+    if (next) next.disabled = page >= pages - 1;
+    if (currentEl) currentEl.textContent = String(page + 1);
+    if (totalEl) totalEl.textContent = String(pages);
+  }
+
+  prev?.addEventListener("click", () => { page--; render(); });
+  next?.addEventListener("click", () => { page++; render(); });
+  sortRecent?.addEventListener("click", () => reorder("recent"));
+  sortStars?.addEventListener("click", () => reorder("stars"));
+</script>
+
+<style>
+  .work {
+    padding: 6rem 0;
+  }
+
+  .work-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3rem;
+  }
+
+  .section-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--fg-muted);
+  }
+
+  .work-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .sort-btn {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--fg-faint);
+    font-family: var(--font);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .sort-btn:hover {
+    color: var(--fg-muted);
+  }
+
+  .sort-btn.active {
+    color: var(--fg);
+    border-color: var(--border);
+  }
+
+  .pager {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: 0.5rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--border);
+  }
+
+  .page-info {
+    font-size: 12px;
+    color: var(--fg-faint);
+    min-width: 2em;
+    text-align: center;
+  }
+
+  .pager-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--fg);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    font-family: var(--font);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .pager-btn:hover:not(:disabled) {
+    border-color: var(--fg);
+    background: var(--fg);
+    color: var(--bg);
+  }
+
+  .pager-btn:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+
+  .project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .project {
+    padding: 2rem 0;
+    border-top: 1px solid var(--border);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .project:last-child:not(.hidden) {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .project.hidden {
+    display: none;
+  }
+
+  .project-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.75rem;
+  }
+
+  .project-name {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .project-link {
+    color: var(--fg);
+    text-decoration: none;
+  }
+
+  .project-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .project-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 12px;
+    color: var(--fg-faint);
+  }
+
+  .project-stars {
+    color: var(--fg-muted);
+  }
+
+  .project-stars.dim {
+    color: var(--fg-faint);
+  }
+
+  .meta-sep {
+    color: var(--border);
+  }
+
+  .project-year {
+    color: var(--fg-faint);
+  }
+
+  .project-desc {
+    font-size: 13px;
+    color: var(--fg-muted);
+    max-width: 540px;
+    margin-bottom: 1rem;
+  }
+
+  .project-tags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 11px;
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--fg-muted);
+    transition: all 0.2s ease;
+  }
+
+  .project:hover .tag {
+    border-color: var(--fg-faint);
+    color: var(--fg);
+  }
+</style>

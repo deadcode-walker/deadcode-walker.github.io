@@ -1,0 +1,69 @@
+---
+---
+
+<section id="contact" class="contact">
+  <div class="container">
+    <div class="contact-inner reveal">
+      <div class="terminal">
+        <span class="prompt">$</span>
+        <span class="cmd">find deadcode-walker</span>
+      </div>
+      <a href="https://github.com/deadcode-walker" class="contact-link" target="_blank" rel="noopener">
+        github.com/deadcode-walker
+        <span class="arrow">→</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .contact {
+    padding: 6rem 0 4rem;
+  }
+
+  .contact-inner {
+    text-align: center;
+  }
+
+  .terminal {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 1.5rem;
+  }
+
+  .prompt {
+    color: var(--fg-faint);
+    margin-right: 0.5em;
+  }
+
+  .cmd {
+    color: var(--fg);
+  }
+
+  .contact-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 13px;
+    color: var(--fg-muted);
+    padding: 0.625rem 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .contact-link .arrow {
+    transition: transform 0.2s ease;
+    display: inline-block;
+  }
+
+  .contact-link:hover {
+    color: var(--fg);
+    border-color: var(--fg);
+  }
+
+  .contact-link:hover .arrow {
+    transform: translateX(4px);
+  }
+</style>

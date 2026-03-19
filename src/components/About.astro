@@ -1,0 +1,91 @@
+---
+const stats = [
+  { label: "languages", value: "c/c++, rust, asm" },
+  { label: "focus", value: "re, systems, tooling" },
+  { label: "env", value: "arch, hyprland, nvim" },
+  { label: "hardware", value: "9950x3d, rtx 5080" },
+];
+---
+
+<section id="about" class="about">
+  <div class="container">
+    <h2 class="section-label reveal">about</h2>
+    <div class="about-grid">
+      <div class="about-text reveal">
+        <p>
+          reverse engineering and systems programming. building tools that work at the level the machine actually operates — memory-mapped I/O, hypervisor interfaces, kernel drivers. no abstractions that lie about what's happening underneath.
+        </p>
+        <p>
+          Rust for everything. C++ when the codebase demands it.
+        </p>
+      </div>
+      <div class="about-stats stagger">
+        {stats.map((stat) => (
+          <div class="stat reveal">
+            <span class="stat-label">{stat.label}</span>
+            <span class="stat-value">{stat.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .about {
+    padding: 6rem 0;
+  }
+
+  .about-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: start;
+  }
+
+  .about-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .about-text p {
+    font-size: 13px;
+    color: var(--fg-muted);
+    line-height: 1.8;
+  }
+
+  .about-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.875rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  .stat:first-child {
+    border-top: 1px solid var(--border);
+  }
+
+  .stat-label {
+    color: var(--fg-faint);
+  }
+
+  .stat-value {
+    color: var(--fg);
+    text-align: right;
+  }
+
+  @media (max-width: 640px) {
+    .about-grid {
+      grid-template-columns: 1fr;
+      gap: 2.5rem;
+    }
+  }
+</style>

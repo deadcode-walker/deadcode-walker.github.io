@@ -93,7 +93,7 @@ const totalPages = Math.ceil(projects.length / PAGE_SIZE);
 const projectsJSON = JSON.stringify(projects.map((p, i) => ({ i, stars: p.stars, pushed: p.pushed })));
 ---
 
-<section id="work" class="work">
+<section id="work" class="work" data-page-size={PAGE_SIZE} data-projects={projectsJSON}>
   <div class="container">
     <div class="work-header reveal">
       <h2 class="section-label">selected work</h2>
@@ -151,61 +151,53 @@ const projectsJSON = JSON.stringify(projects.map((p, i) => ({ i, stars: p.stars,
   </div>
 </section>
 
-<script define:vars={{ PAGE_SIZE, totalPages, projectsJSON }}>
+<script>
+  const section = document.getElementById("work")!;
+  const PAGE_SIZE = Number(section.dataset.pageSize);
+  const meta = JSON.parse(section.dataset.projects!);
+
   let page = 0;
-  let currentSort = "recent";
-  const projectEls = [...document.querySelectorAll(".project[data-index]")];
-  const list = document.getElementById("project-list");
-  const prev = document.getElementById("prev-btn");
-  const next = document.getElementById("next-btn");
+  const projectEls = [...document.querySelectorAll<HTMLElement>(".project[data-index]")];
+  const list = document.getElementById("project-list")!;
+  const prev = document.getElementById("prev-btn") as HTMLButtonElement | null;
+  const next = document.getElementById("next-btn") as HTMLButtonElement | null;
   const currentEl = document.getElementById("page-current");
   const totalEl = document.getElementById("page-total");
   const sortRecent = document.getElementById("sort-recent");
   const sortStars = document.getElementById("sort-stars");
-  const meta = JSON.parse(projectsJSON);
 
-  // Sort order: array of original indices in display order
-  let order = meta.map((m) => m.i);
+  let order: number[] = meta.map((m: any) => m.i);
 
-  function reorder(sortBy) {
+  function reorder(sortBy: string) {
     const sorted = [...meta];
     if (sortBy === "stars") {
-      sorted.sort((a, b) => b.stars - a.stars || new Date(b.pushed).getTime() - new Date(a.pushed).getTime());
+      sorted.sort((a: any, b: any) => b.stars - a.stars || +new Date(b.pushed) - +new Date(a.pushed));
     } else {
-      sorted.sort((a, b) => new Date(b.pushed).getTime() - new Date(a.pushed).getTime());
+      sorted.sort((a: any, b: any) => +new Date(b.pushed) - +new Date(a.pushed));
     }
-    order = sorted.map((m) => m.i);
+    order = sorted.map((m: any) => m.i);
     page = 0;
-    currentSort = sortBy;
 
-    sortRecent.classList.toggle("active", sortBy === "recent");
-    sortStars.classList.toggle("active", sortBy === "stars");
+    sortRecent?.classList.toggle("active", sortBy === "recent");
+    sortStars?.classList.toggle("active", sortBy === "stars");
 
-    // Reorder DOM
-    order.forEach((idx) => {
+    for (const idx of order) {
       const el = projectEls.find((e) => Number(e.dataset.index) === idx);
       if (el) list.appendChild(el);
-    });
-
+    }
     render();
   }
 
   function render() {
     const pages = Math.ceil(order.length / PAGE_SIZE);
     const start = page * PAGE_SIZE;
-    const end = start + PAGE_SIZE;
-    const visible = new Set(order.slice(start, end));
+    const visible = new Set(order.slice(start, start + PAGE_SIZE));
 
-    projectEls.forEach((el) => {
+    for (const el of projectEls) {
       const i = Number(el.dataset.index);
-      if (visible.has(i)) {
-        el.classList.remove("hidden");
-        el.classList.add("visible");
-      } else {
-        el.classList.add("hidden");
-        el.classList.remove("visible");
-      }
-    });
+      el.classList.toggle("hidden", !visible.has(i));
+      el.classList.toggle("visible", visible.has(i));
+    }
 
     if (prev) prev.disabled = page === 0;
     if (next) next.disabled = page >= pages - 1;
@@ -218,34 +210,27 @@ const projectsJSON = JSON.stringify(projects.map((p, i) => ({ i, stars: p.stars,
   sortRecent?.addEventListener("click", () => reorder("recent"));
   sortStars?.addEventListener("click", () => reorder("stars"));
 
-  // Live star count fetch — updates the static build-time counts
-  async function fetchLiveStars() {
-    try {
-      const res = await fetch(
-        "https://api.github.com/users/deadcode-walker/repos?per_page=30"
-      );
-      if (!res.ok) return;
-      const repos = await res.json();
-      const starMap = {};
-      for (const r of repos) starMap[r.name] = r.stargazers_count;
+  // Live star counts from GitHub API
+  fetch("https://api.github.com/users/deadcode-walker/repos?per_page=30")
+    .then((r) => r.ok ? r.json() : [])
+    .then((repos: any[]) => {
+      const stars: Record<string, number> = {};
+      for (const r of repos) stars[r.name] = r.stargazers_count;
 
-      projectEls.forEach((el) => {
+      for (const el of projectEls) {
         const name = el.querySelector(".project-link")?.textContent?.trim();
-        if (!name || !(name in starMap)) return;
-        const stars = starMap[name];
-        const starEl = el.querySelector(".project-stars");
-        if (starEl) {
-          starEl.textContent = `\u2605 ${stars}`;
-          starEl.classList.toggle("dim", stars === 0);
+        if (!name || !(name in stars)) continue;
+        const count = stars[name];
+        const span = el.querySelector(".project-stars");
+        if (span) {
+          span.textContent = `\u2605 ${count}`;
+          span.classList.toggle("dim", count === 0);
         }
-        // Update sort metadata
-        const idx = Number(el.dataset.index);
-        const m = meta.find((x) => x.i === idx);
-        if (m) m.stars = stars;
-      });
-    } catch {}
-  }
-  fetchLiveStars();
+        const m = meta.find((x: any) => x.i === Number(el.dataset.index));
+        if (m) m.stars = count;
+      }
+    })
+    .catch(() => {});
 </script>
 
 <style>

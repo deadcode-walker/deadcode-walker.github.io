@@ -217,6 +217,35 @@ const projectsJSON = JSON.stringify(projects.map((p, i) => ({ i, stars: p.stars,
   next?.addEventListener("click", () => { page++; render(); });
   sortRecent?.addEventListener("click", () => reorder("recent"));
   sortStars?.addEventListener("click", () => reorder("stars"));
+
+  // Live star count fetch — updates the static build-time counts
+  async function fetchLiveStars() {
+    try {
+      const res = await fetch(
+        "https://api.github.com/users/deadcode-walker/repos?per_page=30"
+      );
+      if (!res.ok) return;
+      const repos = await res.json();
+      const starMap = {};
+      for (const r of repos) starMap[r.name] = r.stargazers_count;
+
+      projectEls.forEach((el) => {
+        const name = el.querySelector(".project-link")?.textContent?.trim();
+        if (!name || !(name in starMap)) return;
+        const stars = starMap[name];
+        const starEl = el.querySelector(".project-stars");
+        if (starEl) {
+          starEl.textContent = `\u2605 ${stars}`;
+          starEl.classList.toggle("dim", stars === 0);
+        }
+        // Update sort metadata
+        const idx = Number(el.dataset.index);
+        const m = meta.find((x) => x.i === idx);
+        if (m) m.stars = stars;
+      });
+    } catch {}
+  }
+  fetchLiveStars();
 </script>
 
 <style>
